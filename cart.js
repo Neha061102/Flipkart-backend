@@ -1,18 +1,23 @@
-const mongoose = require("mongoose");
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 
 const Cart = mongoose.model(
   "Cart",
-  new mongoose.Schema({
-    userId: String,
-    items: [
-      {
-        productId: String,
-        quantity: Number,
-      },
-    ],
-  })
+  new mongoose.Schema(
+    {
+      userId: { type: String, required: true },
+      items: [
+        {
+          productId: { type: String, required: true },
+          quantity: { type: Number, default: 1 },
+        },
+      ],
+      status: { type: String, default: "active" },
+      updatedAt: { type: Date, default: Date.now },
+    },
+    { timestamps: true }
+  )
 );
 
 router.post("/cart/add", async (req, res) => {
@@ -28,20 +33,15 @@ router.post("/cart/add", async (req, res) => {
     let cart = await Cart.findOne({ userId: user, status: "active" });
 
     if (!cart) {
-      cart = new Cart({ userId: user, items: [], status: "active" });
+      cart = new Cart({ userId: user, items: [] });
     }
 
-    const existingItemIndex = cart.items.findIndex(
-      (item) => item.productId === productId
-    );
+    const index = cart.items.findIndex((item) => item.productId === productId);
 
-    if (existingItemIndex > -1) {
-      cart.items[existingItemIndex].quantity += parseInt(quantity);
+    if (index > -1) {
+      cart.items[index].quantity += parseInt(quantity);
     } else {
-      cart.items.push({
-        productId,
-        quantity: parseInt(quantity),
-      });
+      cart.items.push({ productId, quantity: parseInt(quantity) });
     }
 
     cart.updatedAt = new Date();
@@ -64,7 +64,6 @@ router.post("/cart/add", async (req, res) => {
 router.get("/carts", async (req, res) => {
   try {
     const carts = await Cart.find({});
-
     res.status(200).json({
       success: true,
       count: carts.length,
@@ -80,14 +79,6 @@ router.get("/carts", async (req, res) => {
   }
 });
 
-module.exports = router;
-
-// Delete route-assignment
-
-// router.delete("/cart/:id",async(req,res)=>{
-//     //check if items is there in the cart,-do the delete operation.
-//     //if item is not there-err to user
-// })
 router.delete("/cart/:id", async (req, res) => {
   try {
     const productId = req.params.id;
@@ -100,7 +91,6 @@ router.delete("/cart/:id", async (req, res) => {
       });
     }
 
-    // Find the user's active cart
     const cart = await Cart.findOne({ userId: userId, status: "active" });
 
     if (!cart) {
@@ -110,11 +100,10 @@ router.delete("/cart/:id", async (req, res) => {
       });
     }
 
-    // Filter out the item to delete
-    const initialLength = cart.items.length;
+    const originalLength = cart.items.length;
     cart.items = cart.items.filter((item) => item.productId !== productId);
 
-    if (cart.items.length === initialLength) {
+    if (cart.items.length === originalLength) {
       return res.status(404).json({
         success: false,
         message: "Product not found in cart",
@@ -138,3 +127,5 @@ router.delete("/cart/:id", async (req, res) => {
     });
   }
 });
+
+module.exports = router;
